@@ -12,38 +12,64 @@ import (
 	"github.com/xfrr/goffmpeg/transcoder"
 )
 
-func isExisted(fp string) bool {
+func isExisted(fp string, isMandatory bool) (ret bool) {
+	ret = true
 	if _, err := os.Stat(fp); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func isValidPath(fp string) (ret bool) {
-	if !filepath.IsAbs(fp) {
-		panic("not absolute path: " + fp)
-	}
-
-	if !isExisted(fp) {
-		panic("path is not existed: " + fp)
-	}
-
-	return true
-}
-
-func getOutputFileName(outputPath string, title string) string {
-	isValidPath(outputPath)
-
-	currentTime := time.Now()
-	outputFile := filepath.Join(outputPath, title+"_"+currentTime.Format("2020-01-01")+".flv")
-	cnt := 0
-	for {
-		if isExisted(outputFile) {
-			fmt.Println("already existed: ", outputFile)
-			cnt++
-			outputFile = filepath.Join(outputPath, title+"_"+currentTime.Format("2020-01-01")+"_"+strconv.Itoa(cnt)+".flv")
+		if isMandatory {
+			createDirectory(fp)
 		} else {
-			fmt.Println("new file: ", outputFile)
+			ret = false
+		}
+	}
+	return ret
+}
+
+func createDirectory(path string) {
+	err := os.Mkdir(path, 0755)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("create output directory: ", path)
+}
+
+func getAbsPath(fp string) string {
+	absPath := fp
+	if !filepath.IsAbs(fp) {
+		_absPath, err := filepath.Abs(fp)
+		if err != nil {
+			panic("path is invalid: " + fp)
+		}
+		absPath = _absPath
+	}
+
+	return absPath
+}
+
+func getNewFilename(absPath string, title string, isVideo bool) string {
+	currentTime := time.Now()
+	timeString := currentTime.Format(time.RFC3339)
+	var format string
+	if isVideo {
+		format = ".mp4"
+	} else {
+		format = ".mp3"
+	}
+	filename := title + "_" + timeString + format
+	outputFile := filepath.Join(absPath, filename)
+
+	return outputFile
+}
+
+func getOutputFileName(outputPath string, title string, isVideo bool) string {
+	absPath := getAbsPath(outputPath)
+	isExisted(absPath, true)
+
+	outputFile := getNewFilename(absPath, title, isVideo)
+	for {
+		if isExisted(outputFile, false) {
+			fmt.Println("already existed: ", outputFile)
+			outputFile = getNewFilename(absPath, title, isVideo)
+		} else {
 			break
 		}
 	}
@@ -51,11 +77,12 @@ func getOutputFileName(outputPath string, title string) string {
 	return outputFile
 }
 
-func transcode(inputURL string, outputFile string, durationString string) {
+// Run transcode media stream to file
+func Run(inputURL string, outputFile string, durationString string, isVideo bool, isDebug bool) {
 	// Create new instance of transcoder
 	trans := new(transcoder.Transcoder)
 
-	// Initialize transcoder passing the input file path and output file path
+	// Initialize transcoder passing the input url and output file path
 	err := trans.Initialize(inputURL, outputFile)
 	if err != nil {
 		panic(err)
@@ -63,8 +90,14 @@ func transcode(inputURL string, outputFile string, durationString string) {
 
 	trans.MediaFile().SetDuration(durationString)
 	trans.MediaFile().SetOutputPath(outputFile)
+	if isVideo {
+		trans.MediaFile().SetVideoCodec("libx264")
+	} else {
+		trans.MediaFile().SetSkipVideo(true)
+	}
 
 	// Start transcoder process without checking progress
+	fmt.Println("new file: ", outputFile)
 	done := trans.Run(false)
 
 	// This channel is used to wait for the process to end
@@ -74,53 +107,44 @@ func transcode(inputURL string, outputFile string, durationString string) {
 	}
 }
 
-// Run run butteryfly with parameters
-func Run(input string, output string, duration int, title string) (outputFile string) {
-	inputURL := input
-	outputFile = getOutputFileName(output, title)
-	//durationString := strconv.Itoa(duration * 60)
-	durationString := strconv.Itoa(duration)
-
-	transcode(inputURL, outputFile, durationString)
-
-	return
-}
-
 // Preset struct for preset
 type Preset struct {
 	Title      string `json:"title"`
 	InputURL   string `json:"inputURL"`
 	OutputPath string `json:"outputPath"`
-	Duration   string `json:"duration"`
+	Duration   int    `json:"duration"`
 	Token      string `json:"token,omitempty"`
+	Video      bool   `json:"video"`
 }
 
-func parsePreset(preset string) (string, string, string, string) {
-	isValidPath(preset)
+func getDurationString(duration int, isDebug bool) string {
+	var weight int = 1
+	if !isDebug {
+		weight = 60
+	}
+	return strconv.Itoa(duration * weight)
+}
 
-	file, _ := ioutil.ReadFile(preset)
-	data := Preset{}
-
-	_ = json.Unmarshal([]byte(file), &data)
-
-	if !isExisted(data.OutputPath) {
-		err := os.Mkdir(data.OutputPath, 0755)
-		fmt.Println("create output directory:", data.OutputPath)
-		if err != nil {
-			panic(err)
-		}
+// ParsePreset parse preset
+func ParsePreset(preset string, isDebug bool) (string, string, string, string, bool) {
+	absPresetPath := getAbsPath(preset)
+	if !isExisted(absPresetPath, false) {
+		panic("wrong preset file: " + absPresetPath)
 	}
 
-	outputFile := getOutputFileName(data.OutputPath, data.Title)
-	Token := data.Token
-	fmt.Println(Token)
-	return data.InputURL, outputFile, data.Duration, data.Token
+	file, _ := ioutil.ReadFile(absPresetPath)
+	data := Preset{}
+	_ = json.Unmarshal([]byte(file), &data)
+
+	outputFile := getOutputFileName(data.OutputPath, data.Title, data.Video)
+
+	return data.InputURL, outputFile, getDurationString(data.Duration, isDebug), data.Token, data.Video
 }
 
-// RunPreset run butterfly with preset
-func RunPreset(preset string) (string, string) {
-	inputURL, outputFile, durationString, token := parsePreset(preset)
+// ParseParameter parse parameter
+func ParseParameter(input string, output string, duration int, title string, isVideo bool) (string, string, string) {
+	inputURL := input
+	outputFile := getOutputFileName(output, title, isVideo)
 
-	transcode(inputURL, outputFile, durationString)
-	return outputFile, token
+	return inputURL, outputFile, getDurationString(duration, false)
 }

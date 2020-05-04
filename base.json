@@ -2,6 +2,7 @@
     "title": "",
     "inputURL": "",
     "outputPath": "",
-    "duration": "",
-    "Token": ""
+    "duration": 0,
+    "token": "",
+    "video": false
 }

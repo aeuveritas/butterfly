@@ -23,11 +23,13 @@ import (
 // runCmd represents the run command
 var runCmd = &cobra.Command{
 	Use:   "run -i [INPUT_URL] -o [OUTPUT_PATH] -d [DURATION]",
-	Short: "A brief description of your command",
+	Short: "transcode media stream to file",
 	Long:  "butterfly run -i INPUT_URL -o OUTPUT_DIRECTORY -d DURATION_IN_MIN -t TITLE",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		transcode.Run(input, output, duration, title)
+		inputURL, outputFile, durationString := transcode.ParseParameter(input, output, duration, title, video)
+
+		transcode.Run(inputURL, outputFile, durationString, video, false)
 	},
 }
 
@@ -35,6 +37,7 @@ var input string
 var output string
 var duration int
 var title string
+var video bool
 
 func init() {
 	rootCmd.AddCommand(runCmd)
@@ -49,9 +52,10 @@ func init() {
 	// is called directly, e.g.:
 	// runCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	runCmd.Flags().StringVarP(&input, "input", "i", "", "URL for input stream (required)")
-	runCmd.Flags().StringVarP(&output, "output", "o", "", "directory(absolute path) for output (required)")
+	runCmd.Flags().StringVarP(&output, "output", "o", "", "directory for output (required)")
 	runCmd.Flags().IntVarP(&duration, "duration", "d", 0, "duration in minutes (required)")
 	runCmd.Flags().StringVarP(&title, "title", "t", "noname", "title for output file")
+	runCmd.Flags().BoolVarP(&video, "video", "v", false, "audio or video (default: audio)")
 	runCmd.MarkFlagRequired("input")
 	runCmd.MarkFlagRequired("output")
 	runCmd.MarkFlagRequired("duration")

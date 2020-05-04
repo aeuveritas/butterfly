@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
+	"path/filepath"
 	"strconv"
+
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 type initResponse struct {
@@ -25,13 +27,12 @@ type initChat struct {
 	ID int `json:"id,omitempty"`
 }
 
-// Notify send notification to telegram
-func Notify(filename string, token string) {
+// GetTelegramObject return chat id for telegram
+func GetTelegramObject(token string, isDebug bool) (string, *tb.Bot) {
 	if token != "" {
-		baseURL := "https://api.telegram.org/bot" + token + "/"
+		URL := "https://api.telegram.org/bot" + token + "/getUpdates"
 
-		initURL := baseURL + "getUpdates"
-		resp, err := http.Get(initURL)
+		resp, err := http.Get(URL)
 		if err != nil {
 			panic(err)
 		}
@@ -41,17 +42,71 @@ func Notify(filename string, token string) {
 		if err != nil {
 			panic(err)
 		}
-		if len(target.Results) != 1 {
-			panic("many results in telegram api")
-		}
-		chatID := target.Results[0].Message.Chat.ID
-		filenameInURL := filename + " is saved"
-		sendURL := baseURL + "sendMessage?chat_id=" + strconv.Itoa(chatID) + "&text=" + url.QueryEscape(filenameInURL)
-		resp, err = http.Post(sendURL, "application/json", nil)
+
+		bot, err := tb.NewBot(tb.Settings{
+			URL:   "https://api.telegram.org",
+			Token: token,
+		})
 		if err != nil {
 			panic(err)
 		}
-	} else {
-		fmt.Println("telegram is not set")
+
+		if len(target.Results) == 0 {
+			fmt.Println("telegram is not ready.")
+			return "", nil
+		}
+
+		return strconv.Itoa(target.Results[0].Message.Chat.ID), bot
+	}
+	fmt.Println("telegram is not set.")
+	return "", nil
+}
+
+// BFRecipient recipient for butterfly
+type BFRecipient struct {
+	chatID string
+}
+
+// Recipient implement for Recipient
+func (r BFRecipient) Recipient() string {
+	return r.chatID
+}
+
+// SendText send notification with text to telegram
+func SendText(bot *tb.Bot, chatID string, filename string, isDebug bool) {
+	if bot != nil && chatID != "" {
+		recipient := BFRecipient{chatID: chatID}
+
+		_, file := filepath.Split(filename)
+		message := "start record: " + file
+		if !isDebug {
+			bot.Send(recipient, message)
+		}
+	}
+}
+
+// SendAudio send notification with audio to telegram
+func SendAudio(bot *tb.Bot, chatID string, filename string, isDebug bool) {
+	if bot != nil && chatID != "" {
+		recipient := BFRecipient{chatID: chatID}
+
+		_, file := filepath.Split(filename)
+		audio := &tb.Audio{File: tb.FromDisk(filename), Title: file}
+		if !isDebug {
+			bot.Send(recipient, audio)
+		}
+	}
+}
+
+// SendVideo send notification with video to telegram
+func SendVideo(bot *tb.Bot, chatID string, filename string, isDebug bool) {
+	if bot != nil && chatID != "" {
+		recipient := BFRecipient{chatID: chatID}
+
+		_, file := filepath.Split(filename)
+		video := &tb.Video{File: tb.FromDisk(filename), FileName: file}
+		if !isDebug {
+			bot.Send(recipient, video)
+		}
 	}
 }

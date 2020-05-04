@@ -21,38 +21,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// presetCmd represents the preset command
-var presetCmd = &cobra.Command{
-	Use:   "preset [JSON_FOR_PRESET]",
-	Short: "transcode media stream to file with preset",
-	Long:  "butterfly preset JSON_FOR_PRESET",
+// debugCmd represents the debug command
+var debugCmd = &cobra.Command{
+	Use:   "debug [JSON_FOR_PRESET]",
+	Short: "transcode media stream to file with preset (debug)",
+	Long:  "butterfly debug JSON_FOR_PRESET",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		runPreset(args)
+		runDebug(args)
 	},
 }
 
-var preset string
-
 func init() {
-	rootCmd.AddCommand(presetCmd)
+	rootCmd.AddCommand(debugCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// presetCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// debugCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// presetCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// debugCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-func runPreset(args []string) {
+func runDebug(args []string) {
 	if len(args) != 1 {
 		panic("one input json absolute path for preset required")
 	} else {
-		isDebug := false
+		isDebug := true
 		inputURL, outputFile, durationString, token, video := transcode.ParsePreset(args[0], isDebug)
 		chatID, bot := notification.GetTelegramObject(token, isDebug)
 
