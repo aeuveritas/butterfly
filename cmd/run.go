@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/aeuveritas/butterfly/parser"
 	"github.com/aeuveritas/butterfly/transcode"
 	"github.com/spf13/cobra"
 )
@@ -27,9 +28,10 @@ var runCmd = &cobra.Command{
 	Long:  "butterfly run -i INPUT_URL -o OUTPUT_DIRECTORY -d DURATION_IN_MIN -t TITLE",
 
 	Run: func(cmd *cobra.Command, args []string) {
-		inputURL, outputFile, durationString := transcode.ParseParameter(input, output, duration, title, video)
+		pParser := parser.PresetParser{}
+		pParser.ParseParameter(input, output, duration, title, video)
 
-		transcode.Run(inputURL, outputFile, durationString, video, false)
+		transcode.Run(pParser.InfoData, false)
 	},
 }
 

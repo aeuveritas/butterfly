@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"github.com/aeuveritas/butterfly/notification"
+	"github.com/aeuveritas/butterfly/parser"
 	"github.com/aeuveritas/butterfly/transcode"
 	"github.com/spf13/cobra"
 )
@@ -53,15 +54,28 @@ func runPreset(args []string) {
 		panic("one input json absolute path for preset required")
 	} else {
 		isDebug := false
-		inputURL, outputFile, durationString, token, video := transcode.ParsePreset(args[0], isDebug)
-		chatID, bot := notification.GetTelegramObject(token, isDebug)
-
-		notification.SendText(bot, chatID, outputFile, isDebug)
-		transcode.Run(inputURL, outputFile, durationString, video, isDebug)
-		if video {
-			notification.SendVideo(bot, chatID, outputFile, isDebug)
-		} else {
-			notification.SendAudio(bot, chatID, outputFile, isDebug)
+		var tParser parser.TelegramParser = parser.TelegramParser{
+			InfoFile: "./telegram.json",
 		}
+		tParser.Parse()
+		var pParser parser.PresetParser = parser.PresetParser{
+			InfoFile: args[0],
+		}
+		pParser.Parse()
+
+		bot := notification.GetTelegramBot(tParser.InfoData.Token, isDebug)
+		chatID := notification.GetChatID(&tParser.InfoData, pParser.InfoData)
+		if chatID != "" {
+			tParser.SaveTelegramInfo()
+		}
+
+		notification.SendText(bot, chatID, pParser.InfoData.OutputFile, isDebug)
+		transcode.Run(pParser.InfoData, isDebug)
+		if video {
+			notification.SendVideo(bot, chatID, pParser.InfoData.OutputFile, isDebug)
+		} else {
+			notification.SendAudio(bot, chatID, pParser.InfoData.OutputFile, isDebug)
+		}
+
 	}
 }

@@ -16,8 +16,6 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/aeuveritas/butterfly/notification"
-	"github.com/aeuveritas/butterfly/transcode"
 	"github.com/spf13/cobra"
 )
 
@@ -50,16 +48,16 @@ func runDebug(args []string) {
 	if len(args) != 1 {
 		panic("one input json absolute path for preset required")
 	} else {
-		isDebug := true
-		inputURL, outputFile, durationString, token, video := transcode.ParsePreset(args[0], isDebug)
-		chatID, bot := notification.GetTelegramObject(token, isDebug)
+		// isDebug := true
+		// inputURL, outputFile, durationString, token, video := transcode.ParsePreset(args[0], isDebug)
+		// chatID, bot := notification.GetTelegramObject(token, isDebug)
 
-		notification.SendText(bot, chatID, outputFile, isDebug)
-		transcode.Run(inputURL, outputFile, durationString, video, isDebug)
-		if video {
-			notification.SendVideo(bot, chatID, outputFile, isDebug)
-		} else {
-			notification.SendAudio(bot, chatID, outputFile, isDebug)
-		}
+		// notification.SendText(bot, chatID, outputFile, isDebug)
+		// transcode.Run(inputURL, outputFile, durationString, video, isDebug)
+		// if video {
+		// 	notification.SendVideo(bot, chatID, outputFile, isDebug)
+		// } else {
+		// 	notification.SendAudio(bot, chatID, outputFile, isDebug)
+		// }
 	}
 }

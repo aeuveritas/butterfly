@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/aeuveritas/butterfly/parser"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
@@ -24,13 +25,38 @@ type initMessage struct {
 }
 
 type initChat struct {
-	ID int `json:"id,omitempty"`
+	Title string `json:"title,omitempty"`
+	ID    int    `json:"id,omitempty"`
 }
 
-// GetTelegramObject return chat id for telegram
-func GetTelegramObject(token string, isDebug bool) (string, *tb.Bot) {
+// GetTelegramBot get telegram bot
+func GetTelegramBot(token string, isDebug bool) *tb.Bot {
 	if token != "" {
-		URL := "https://api.telegram.org/bot" + token + "/getUpdates"
+		bot, err := tb.NewBot(tb.Settings{
+			URL:   "https://api.telegram.org",
+			Token: token,
+		})
+		if err != nil {
+			panic(err)
+		}
+		return bot
+	}
+
+	return nil
+}
+
+// GetChatID get chat ID
+func GetChatID(tData *parser.TelegramInfo, pData parser.PresetInfo) string {
+	if tData.Token != "" {
+		targetTitle := pData.Title
+
+		for _, chat := range tData.Chats {
+			if targetTitle == chat.Title {
+				return chat.ID
+			}
+		}
+
+		URL := "https://api.telegram.org/bot" + tData.Token + "/getUpdates"
 
 		resp, err := http.Get(URL)
 		if err != nil {
@@ -43,23 +69,25 @@ func GetTelegramObject(token string, isDebug bool) (string, *tb.Bot) {
 			panic(err)
 		}
 
-		bot, err := tb.NewBot(tb.Settings{
-			URL:   "https://api.telegram.org",
-			Token: token,
-		})
-		if err != nil {
-			panic(err)
-		}
-
 		if len(target.Results) == 0 {
 			fmt.Println("telegram is not ready.")
-			return "", nil
+			return ""
 		}
 
-		return strconv.Itoa(target.Results[0].Message.Chat.ID), bot
+		for _, result := range target.Results {
+			if result.Message.Chat.Title == targetTitle {
+				chatID := strconv.Itoa(result.Message.Chat.ID)
+				tData.AddItem(targetTitle, chatID)
+
+				return strconv.Itoa(result.Message.Chat.ID)
+			}
+		}
+
+		fmt.Println("no title in current telegram context")
+		return ""
 	}
-	fmt.Println("telegram is not set.")
-	return "", nil
+
+	return ""
 }
 
 // BFRecipient recipient for butterfly
